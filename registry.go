@@ -54,7 +54,7 @@ func (r *registryRouter) refresh() {
 		if err != nil {
 			attempts++
 			if logger.V(logger.ErrorLevel) {
-				logger.Errorf("unable to list services: %v", err)
+				logger.Errorf(r.opts.Context, "unable to list services: %v", err)
 			}
 			time.Sleep(time.Duration(attempts) * time.Second)
 			continue
@@ -67,7 +67,7 @@ func (r *registryRouter) refresh() {
 			service, err := r.opts.Registry.GetService(r.opts.Context, s.Name)
 			if err != nil {
 				if logger.V(logger.ErrorLevel) {
-					logger.Errorf("unable to get service: %v", err)
+					logger.Errorf(r.opts.Context, "unable to get service: %v", err)
 				}
 				continue
 			}
@@ -95,7 +95,7 @@ func (r *registryRouter) process(res *registry.Result) {
 	service, err := r.opts.Registry.GetService(r.opts.Context, res.Service.Name)
 	if err != nil {
 		if logger.V(logger.ErrorLevel) {
-			logger.Errorf("unable to get %v service: %v", res.Service.Name, err)
+			logger.Errorf(r.opts.Context, "unable to get %v service: %v", res.Service.Name, err)
 		}
 		return
 	}
@@ -130,7 +130,7 @@ func (r *registryRouter) store(services []*registry.Service) {
 			// if we got nothing skip
 			if err := api.Validate(end); err != nil {
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("endpoint validation failed: %v", err)
+					logger.Tracef(r.opts.Context, "endpoint validation failed: %v", err)
 				}
 				continue
 			}
@@ -177,7 +177,7 @@ func (r *registryRouter) store(services []*registry.Service) {
 			hostreg, err := regexp.CompilePOSIX(h)
 			if err != nil {
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("endpoint have invalid host regexp: %v", err)
+					logger.Tracef(r.opts.Context, "endpoint have invalid host regexp: %v", err)
 				}
 				continue
 			}
@@ -198,7 +198,7 @@ func (r *registryRouter) store(services []*registry.Service) {
 			rule, err := util.Parse(p)
 			if err != nil && !pcreok {
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("endpoint have invalid path pattern: %v", err)
+					logger.Tracef(r.opts.Context, "endpoint have invalid path pattern: %v", err)
 				}
 				continue
 			} else if err != nil && pcreok {
@@ -209,7 +209,7 @@ func (r *registryRouter) store(services []*registry.Service) {
 			pathreg, err := util.NewPattern(tpl.Version, tpl.OpCodes, tpl.Pool, "")
 			if err != nil {
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("endpoint have invalid path pattern: %v", err)
+					logger.Tracef(r.opts.Context, "endpoint have invalid path pattern: %v", err)
 				}
 				continue
 			}
@@ -234,7 +234,7 @@ func (r *registryRouter) watch() {
 		if err != nil {
 			attempts++
 			if logger.V(logger.ErrorLevel) {
-				logger.Errorf("error watching endpoints: %v", err)
+				logger.Errorf(r.opts.Context, "error watching endpoints: %v", err)
 			}
 			time.Sleep(time.Duration(attempts) * time.Second)
 			continue
@@ -259,7 +259,7 @@ func (r *registryRouter) watch() {
 			res, err := w.Next()
 			if err != nil {
 				if logger.V(logger.ErrorLevel) {
-					logger.Errorf("error getting next endpoint: %v", err)
+					logger.Errorf(r.opts.Context, "error getting next endpoint: %v", err)
 				}
 				close(ch)
 				break
@@ -325,7 +325,7 @@ func (r *registryRouter) Endpoint(req *http.Request) (*api.Service, error) {
 			continue
 		}
 		if logger.V(logger.TraceLevel) {
-			logger.Tracef("api method match %s", req.Method)
+			logger.Tracef(r.opts.Context, "api method match %s", req.Method)
 		}
 
 		// 2. try host
@@ -348,7 +348,7 @@ func (r *registryRouter) Endpoint(req *http.Request) (*api.Service, error) {
 			continue
 		}
 		if logger.V(logger.TraceLevel) {
-			logger.Tracef("api host match %s", req.URL.Host)
+			logger.Tracef(r.opts.Context, "api host match %s", req.URL.Host)
 		}
 
 		// 3. try path via google.api path matching
@@ -356,18 +356,18 @@ func (r *registryRouter) Endpoint(req *http.Request) (*api.Service, error) {
 			matches, err := pathreg.Match(path, "")
 			if err != nil {
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("api gpath not match %s != %v", path, pathreg)
+					logger.Tracef(r.opts.Context, "api gpath not match %s != %v", path, pathreg)
 				}
 				continue
 			}
 			if logger.V(logger.TraceLevel) {
-				logger.Tracef("api gpath match %s = %v", path, pathreg)
+				logger.Tracef(r.opts.Context, "api gpath match %s = %v", path, pathreg)
 			}
 			pMatch = true
 			ctx := req.Context()
 			md, ok := metadata.FromContext(ctx)
 			if !ok {
-				md = make(metadata.Metadata)
+				md = metadata.New(len(matches) + 1)
 			}
 			for k, v := range matches {
 				md[fmt.Sprintf("x-api-field-%s", k)] = v
@@ -382,12 +382,12 @@ func (r *registryRouter) Endpoint(req *http.Request) (*api.Service, error) {
 			for _, pathreg := range cep.pcreregs {
 				if !pathreg.MatchString(req.URL.Path) {
 					if logger.V(logger.TraceLevel) {
-						logger.Tracef("api pcre path not match %s != %v", path, pathreg)
+						logger.Tracef(r.opts.Context, "api pcre path not match %s != %v", path, pathreg)
 					}
 					continue
 				}
 				if logger.V(logger.TraceLevel) {
-					logger.Tracef("api pcre path match %s != %v", path, pathreg)
+					logger.Tracef(r.opts.Context, "api pcre path match %s != %v", path, pathreg)
 				}
 				pMatch = true
 				break
