@@ -432,7 +432,7 @@ func (r *registerRouter) Route(req *http.Request) (*api.Service, error) {
 	name := rp.Name
 
 	// get service
-	services, err := r.opts.Register.LookupService(r.opts.Context, name, register.GetDomain(rp.Domain))
+	services, err := r.opts.Register.LookupService(r.opts.Context, name, register.LookupDomain(rp.Domain))
 	if err != nil {
 		return nil, err
 	}
